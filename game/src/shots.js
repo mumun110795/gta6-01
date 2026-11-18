@@ -1,79 +1,189 @@
-// The screenshot scenes behind ?shot=start|play|end. Each one plays the real rules forward from a
-// fresh world for a fixed number of steps, steered by a simple autopilot (look ahead each way the
-// paddle could move, keep clear of blocks, chase the lowest coin when that is safe), so the frame
-// is what a short game really looks like and the same seed always gives the same frame.
-import { FIELD, PLAYER, STEP } from './config.js';
-import { EVENT_OVER, KIND_BLOCK } from './world.js';
-import { SCREEN_OVER, SCREEN_PLAY, SCREEN_TITLE } from './render.js';
-
-const START_SECONDS = 5;
-const PLAY_SECONDS = 26;
-const END_LIMIT_SECONDS = 600;
-/**
- * How far ahead, in seconds, the autopilot checks each way it could move: the play scene's pilot
- * looks well ahead and keeps all its lives; the end scene's looks only a moment ahead, so it is
- * caught out once the blocks speed up, as a hurried player is.
- */
-const HORIZON_PLAY = 0.7;
-const HORIZON_END = 0.25;
-const SAMPLE = 1 / 30;
-const DIRECTIONS = [0, -1, 1];
-/** Extra room, each side, it keeps between the paddle and a block. */
-const MARGIN = 10;
-
-/** Seconds until moving in `direction` (-1, 0, 1) runs the paddle into a block; Infinity when it never does. */
-function timeToHit(state, direction, horizon) {
-  const player = state.player;
-  for (let t = SAMPLE; t <= horizon; t += SAMPLE) {
-    const x = Math.min(FIELD.width - player.width, Math.max(0, player.x + direction * PLAYER.speed * t));
-    for (let index = 0; index < state.items.length; index += 1) {
-      const item = state.items[index];
-      if (!item.active || item.kind !== KIND_BLOCK) continue;
-      const y = item.y + item.speed * t;
-      if (y + item.height > player.y && y < player.y + player.height && item.x < x + player.width + MARGIN && item.x + item.width > x - MARGIN) return t;
+export const SHOT_SCENES = {
+  chase: {
+    timeOfDay: 18.6,
+    objective: 'LOSE THE POLICE — REACH THE DROP',
+    apply(scene, ctx) {
+      const point = roadScenePoint(ctx.roads, (road) => {
+        const middle = roadMiddle(road);
+        return middle.x < -500 && middle.z > -250 && middle.z < 100;
+      });
+      ctx.setPlayerAt(point, true);
+      ctx.setWanted(3);
+      ctx.setObjective(ctx.objective);
+      ctx.spawnPoliceAt({
+        x: point.x + Math.sin(point.heading) * 22 + Math.cos(point.heading) * 1.6,
+        z: point.z + Math.cos(point.heading) * 22 - Math.sin(point.heading) * 1.6,
+        heading: point.heading + 0.61,
+      });
+      ctx.spawnPolice(1, { chase: false, distance: 10 });
+      ctx.spawnPolice(1, { chase: false, distance: 18 });
+      ctx.sprinkleLife({ cars: 0, pedestrians: 10 });
+      scene.userData.shotCamera = 'chase';
+    }
+  },
+  street: {
+    timeOfDay: 9.5,
+    objective: '',
+    apply(scene, ctx) {
+      const road = ctx.roads.find((candidate) => {
+        const middle = roadMiddle(candidate);
+        return candidate.width === 8
+          && middle.x > 200
+          && middle.x < 360
+          && middle.z > 180
+          && middle.z < 320;
+      }) ?? ctx.roads[0];
+      const heading = Math.atan2(road.x2 - road.x1, road.z2 - road.z1);
+      const point = {
+        x: roadMiddle(road).x + Math.cos(heading) * 4.5,
+        z: roadMiddle(road).z - Math.sin(heading) * 4.5,
+        heading,
+      };
+      ctx.setPlayerAt(point, false);
+      ctx.setWanted(0);
+      for (const distance of [5.5, 10.5, 14]) {
+        ctx.spawnPedestrian({
+          x: point.x + Math.sin(heading) * distance + Math.cos(heading) * 4.5,
+          z: point.z + Math.cos(heading) * distance - Math.sin(heading) * 4.5,
+          heading: heading + Math.PI,
+        });
+      }
+      for (const [kind, color, distance, side, headingBias] of [
+        ['sedan', 0xd85563, 6, 2.5, 0],
+        ['pickup', 0x2f9e73, 12, 2.5, 0],
+        ['van', 0xe7eaf2, 18, 2.5, 0],
+        ['sports', 0x9c6ade, 24, 2.5, 0],
+      ]) {
+        ctx.spawnCar(kind, color, {
+          x: point.x + Math.sin(heading) * distance - Math.cos(heading) * side,
+          z: point.z + Math.cos(heading) * distance + Math.sin(heading) * side,
+          heading: heading + headingBias,
+        });
+      }
+      ctx.spawnCar('sedan', 0x2f9e73, {
+        x: point.x + Math.sin(heading) * 7 - Math.cos(heading) * 2.5,
+        z: point.z + Math.cos(heading) * 7 + Math.sin(heading) * 2.5,
+        heading,
+      });
+      ctx.spawnCar('pickup', 0xd8543f, {
+        x: point.x + Math.sin(heading) * 17 - Math.cos(heading) * 2.5,
+        z: point.z + Math.cos(heading) * 17 + Math.sin(heading) * 2.5,
+        heading: heading + Math.PI,
+      });
+      ctx.scene.userData.shotCamera = 'thirdPerson';
+    }
+  },
+  harbor: {
+    timeOfDay: 16.8,
+    objective: 'DELIVER THE CARGO TO THE PIER',
+    apply(scene, ctx) {
+      const point = { x: -527, z: 431, heading: 0.78 };
+      ctx.setPlayerAt(point, true);
+      ctx.setWanted(0);
+      ctx.setObjective(ctx.objective);
+      ctx.spawnPolice(0);
+      for (let index = 0; index < 3; index += 1) {
+        ctx.placeCrate({
+          x: point.x + Math.sin(point.heading) * (8 + index * 4.5) - Math.cos(point.heading) * 7,
+          z: point.z + Math.cos(point.heading) * (8 + index * 4.5) + Math.sin(point.heading) * 7,
+        }, 2.2 + index * 0.3);
+      }
+      ctx.spawnPedestrian({
+        x: point.x + Math.sin(point.heading) * 10 - Math.cos(point.heading) * 7,
+        z: point.z + Math.cos(point.heading) * 10 + Math.sin(point.heading) * 7,
+        heading: point.heading + 0.4,
+      });
+      ctx.spawnCar('pickup', 0x2f9e73, {
+        x: point.x + Math.sin(point.heading) * 18 - Math.cos(point.heading) * 7.5,
+        z: point.z + Math.cos(point.heading) * 18 + Math.sin(point.heading) * 7.5,
+        heading: point.heading + 0.1,
+      });
+      ctx.scene.userData.shotCamera = 'chase';
+    }
+  },
+  night: {
+    timeOfDay: 22.4,
+    objective: '',
+    apply(scene, ctx) {
+      const club = ctx.SPAWN_POINTS.neonClub;
+      const point = { x: club.x - 56, z: club.z - 3, heading: 1.13 };
+      const forwardX = Math.sin(point.heading);
+      const forwardZ = Math.cos(point.heading);
+      ctx.setPlayerAt(point, false);
+      ctx.setWanted(0);
+      ctx.setExposure(2.4);
+      for (const [distance, side, height, text, color] of [
+        [28, 11, 18, 'CALIENTE', '#ff4fa3'],
+        [28, -11, 16, 'MIRAGE 88', '#58d5ff'],
+        [74, 16, 22, 'TINDER PALM', '#ffb347'],
+        [74, -16, 20, 'VOLTA CLUB', '#b78dff'],
+      ]) {
+        ctx.placeNeon(
+          point.x + forwardX * distance + forwardZ * side,
+          height,
+          point.z + forwardZ * distance - forwardX * side,
+          point.heading + Math.PI, text, color,
+        );
+      }
+      ctx.spawnPoliceAt({
+        x: point.x + 13,
+        z: point.z + 5,
+        heading: point.heading + 1.0,
+      });
+      ctx.spawnCar('sedan', 0xe7eaf2, {
+        x: point.x + forwardX * 13 + forwardZ * -7,
+        z: point.z + forwardZ * 13 - forwardX * -7,
+        heading: point.heading + Math.PI,
+      });
+      ctx.addHeadlight({
+        x: point.x + forwardX * 12 + forwardZ * -6,
+        z: point.z + forwardZ * 12 - forwardX * -6,
+        targetX: point.x + forwardX * 1,
+        targetZ: point.z + forwardZ * 1,
+      });
+      for (const [distance, side] of [[4, 2.1], [8, -2.4], [11, 2.8], [15, -1.7]]) {
+        ctx.spawnPedestrian({
+          x: point.x + forwardX * distance + forwardZ * side,
+          z: point.z + forwardZ * distance - forwardX * side,
+          heading: point.heading + (side > 0 ? 0.5 : -0.6),
+        });
+      }
+      ctx.scene.userData.shotCamera = { behind: 7, height: 2.6 };
     }
   }
-  return Infinity;
+};
+
+function roadMiddle(road) {
+  return { x: (road.x1 + road.x2) / 2, z: (road.z1 + road.z2) / 2 };
 }
 
-/** Of the safe ways to move, the one toward the lowest coin (or the centre); else the one that is hit last. */
-function autopilot(state, horizon) {
-  const player = state.player;
-  let coin = null;
-  for (let index = 0; index < state.items.length; index += 1) {
-    const item = state.items[index];
-    if (item.active && item.kind !== KIND_BLOCK && (coin === null || item.y > coin.y)) coin = item;
-  }
-  const target = coin === null ? FIELD.width / 2 : coin.x + coin.width / 2;
-  const centre = player.x + player.width / 2;
-  const wanted = target > centre + 8 ? 1 : target < centre - 8 ? -1 : 0;
-  let best = wanted;
-  let bestTime = timeToHit(state, wanted, horizon);
-  for (let index = 0; index < DIRECTIONS.length && bestTime !== Infinity; index += 1) {
-    const time = timeToHit(state, DIRECTIONS[index], horizon);
-    if (time > bestTime) {
-      bestTime = time;
-      best = DIRECTIONS[index];
-    }
-  }
-  return best;
+function roadLength(road) {
+  return Math.hypot(road.x2 - road.x1, road.z2 - road.z1);
 }
 
-/**
- * Set `world` to the named scene (start, play or end; any other name is start) and return the
- * screen to draw over it and the best score to show.
- */
-export function stageShot(name, world) {
-  world.reset();
-  if (name !== 'play' && name !== 'end') {
-    for (let index = 0; index < START_SECONDS / STEP; index += 1) world.step(STEP, 0, true);
-    return { screen: SCREEN_TITLE, best: 0 };
+function roadScenePoint(roads, matches, rank) {
+  const candidates = (roads ?? []).filter((road) => roadLength(road) >= 70 && matches(road));
+  if (!candidates.length) throw new Error('No suitable shot road found');
+  const road = rank
+    ? candidates.reduce((best, road) => (rank(road, roadMiddle(road)) < rank(best, roadMiddle(best)) ? road : best))
+    : candidates.reduce((best, road) => (roadLength(road) > roadLength(best) ? road : best));
+  return {
+    x: road.x1,
+    z: road.z1,
+    heading: Math.atan2(road.x2 - road.x1, road.z2 - road.z1),
+  };
+}
+
+export function applyShotScene(name, ctx) {
+  const shot = SHOT_SCENES[name];
+  if (!shot) {
+    throw new Error(`Unknown shot scene: ${name}`);
   }
-  const limit = name === 'end' ? END_LIMIT_SECONDS : PLAY_SECONDS;
-  const horizon = name === 'end' ? HORIZON_END : HORIZON_PLAY;
-  for (let index = 0; index < limit / STEP; index += 1) {
-    if (world.step(STEP, autopilot(world.state, horizon), false) & EVENT_OVER) break;
-  }
-  const over = world.state.lives === 0;
-  return { screen: over ? SCREEN_OVER : SCREEN_PLAY, best: world.state.score };
+  ctx.setTimeOfDay(shot.timeOfDay);
+  shot.objective && ctx.setObjective(shot.objective);
+  shot.apply(ctx.scene, {
+    ...ctx,
+    objective: shot.objective,
+    camera: ctx.camera
+  });
 }

@@ -1,19 +1,84 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Block Dodger</title>
-<style>
-  html, body { margin: 0; height: 100%; overflow: hidden; background: #11141b; }
-  #game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
-  /* Read aloud, never shown: the status line screen readers announce. */
-  #status { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-</style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ISLA CENIZA</title>
+  <style>
+    :root { color-scheme: dark; --accent: #ffb347; --panel: rgba(8,12,18,.68); --panel-strong: rgba(6,9,14,.9); --text: #f5f7fa; --muted: #aeb8c6; --danger: #ff5d5d; }
+    * { box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: #05070a; color: var(--text); font-family: system-ui, -apple-system, "Segoe UI", sans-serif; user-select: none; }
+    #game-container, #game-container canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+    .hud { position: fixed; z-index: 10; pointer-events: none; }
+    .panel { border: 1px solid rgba(255,179,71,.35); border-radius: 8px; background: var(--panel); box-shadow: 0 10px 30px rgba(0,0,0,.32); backdrop-filter: blur(8px); }
+    #left-status { left: 20px; top: 18px; width: min(330px, calc(100vw - 40px)); padding: 10px 12px; }
+    .bar-label { display: flex; justify-content: space-between; gap: 18px; margin-bottom: 6px; font-size: 11px; font-weight: 700; letter-spacing: .15em; text-transform: uppercase; color: var(--muted); }
+    .bar-track { height: 10px; overflow: hidden; border-radius: 999px; background: rgba(255,255,255,.1); }
+    #hud-health { width: 100%; height: 100%; border-radius: inherit; background: linear-gradient(90deg,#ff6647,var(--accent)); transform-origin: left; }
+    #hud-status { margin-top: 8px; font-size: 13px; color: var(--muted); white-space: nowrap; }
+    #right-status { right: 20px; top: 18px; min-width: 205px; padding: 10px 12px; text-align: right; }
+    #hud-stars { font-size: 25px; line-height: 1; letter-spacing: 3px; color: rgba(255,255,255,.24); text-shadow: 0 0 12px rgba(255,179,71,.35); transition: color .2s; }
+    #hud-stars.active { color: var(--accent); text-shadow: 0 0 18px rgba(255,179,71,.85); }
+    #hud-cash { margin-top: 6px; font-size: 21px; font-weight: 750; }
+    #hud-clock { margin-top: 2px; font-size: 12px; color: var(--muted); }
+    #mission-hud { left: 50%; top: 20px; width: min(670px, calc(100vw - 40px)); transform: translateX(-50%); text-align: center; }
+    #hud-banner { padding: 7px 14px; border-radius: 999px; font-size: 12px; font-weight: 750; letter-spacing: .19em; text-transform: uppercase; color: #191207; background: var(--accent); box-shadow: 0 6px 24px rgba(255,179,71,.25); }
+    #hud-objective { margin-top: 7px; font-size: 13px; color: #e8edf4; text-shadow: 0 2px 8px rgba(0,0,0,.8); }
+    #minimap { position: fixed; right: 20px; bottom: 20px; z-index: 10; width: 220px; height: 220px; border: 2px solid rgba(255,179,71,.55); border-radius: 50%; background: rgba(5,9,13,.82); box-shadow: 0 12px 36px rgba(0,0,0,.5); pointer-events: none; }
+    #hud-speed { left: 20px; bottom: 20px; min-width: 135px; padding: 9px 14px; font-variant-numeric: tabular-nums; display: none; }
+    #hud-speed-value { font-size: 27px; font-weight: 780; }
+    #hud-speed span { color: var(--muted); font-size: 11px; letter-spacing: .15em; }
+    #dialogue { left: 20px; right: 20px; bottom: 20px; max-width: 760px; padding: 14px 18px; display: none; }
+    #dialogue-speaker { margin-bottom: 5px; color: var(--accent); font-size: 11px; font-weight: 800; letter-spacing: .18em; text-transform: uppercase; }
+    #dialogue-text { margin: 0; color: #eef2f7; font-size: 15px; line-height: 1.5; }
+    .overlay { position: fixed; inset: 0; z-index: 30; display: grid; place-items: center; background: radial-gradient(circle at center,rgba(18,23,29,.82),rgba(3,5,8,.97)); text-align: center; }
+    #pause, #endcard { display: none; }
+    .title { margin: 0; font-size: clamp(45px,10vw,108px); line-height: .92; letter-spacing: .06em; text-transform: uppercase; color: #fff4df; text-shadow: 0 8px 30px rgba(255,179,71,.35); }
+    .subtitle, .overlay-copy { margin: 14px auto 0; max-width: 660px; color: var(--muted); font-size: 15px; line-height: 1.6; }
+    .menu-actions { display: flex; gap: 12px; justify-content: center; margin-top: 32px; flex-wrap: wrap; }
+    .menu-actions button { min-width: 145px; padding: 11px 22px; border: 1px solid rgba(255,179,71,.65); border-radius: 6px; background: rgba(255,179,71,.1); color: #ffe4b7; font: 700 13px/1 inherit; letter-spacing: .12em; text-transform: uppercase; cursor: pointer; transition: .18s; }
+    .menu-actions button:hover, .menu-actions button:focus-visible { background: var(--accent); color: #191207; transform: translateY(-1px); }
+    .end-title { margin: 0; font-size: clamp(51px,11vw,118px); color: var(--danger); letter-spacing: .07em; text-transform: uppercase; }
+    @media (max-width: 700px) { #mission-hud { top: auto; bottom: 254px; } #minimap { width: 150px; height: 150px; } #dialogue, #hud-speed { bottom: 184px; } }
+  </style>
 </head>
 <body>
-<canvas id="game" aria-label="Block Dodger: move the paddle left and right to dodge falling blocks and catch coins"></canvas>
-<p id="status" role="status" aria-live="polite"></p>
-<script type="module" src="./src/main.js"></script>
+  <div id="game-container"></div>
+  <section id="left-status" class="hud panel" aria-label="Player status">
+    <div class="bar-label"><span>Health</span><span id="hud-health-text">100</span></div>
+    <div class="bar-track"><div id="hud-health"></div></div>
+    <div id="hud-status">On foot · Centro Sur</div>
+  </section>
+  <section id="right-status" class="hud panel" aria-label="Wanted level, cash and time">
+    <div id="hud-stars">☆☆☆☆☆</div>
+    <div id="hud-cash">$0</div>
+    <div id="hud-clock">06:00 · TUE</div>
+  </section>
+  <section id="mission-hud" class="hud" aria-label="Mission status">
+    <div id="hud-banner">Welcome to Isla Ceniza</div>
+    <div id="hud-objective">Explore the island</div>
+  </section>
+  <canvas id="minimap" width="220" height="220" aria-label="Minimap"></canvas>
+  <section id="hud-speed" class="hud panel" aria-label="Speedometer">
+    <div id="hud-speed-value">0</div><span>KM/H</span>
+  </section>
+  <section id="dialogue" class="hud panel" aria-live="polite">
+    <div id="dialogue-speaker">Speaker</div><p id="dialogue-text">Dialogue appears here.</p>
+  </section>
+  <section id="menu" class="overlay"><div>
+    <h1 class="title">Isla<br>Ceniza</h1>
+    <p class="subtitle">Ash fell on paradise the day the Caldra family came ashore. Tonight, the island remembers.</p>
+    <div class="menu-actions"><button type="button" data-action="start">New Story</button><button type="button" data-action="continue">Continue</button></div>
+  </div></section>
+  <section id="pause" class="overlay"><div>
+    <h2 class="title" style="font-size:clamp(36px,7vw,68px)">Paused</h2><p class="overlay-copy">The city waits.</p>
+    <div class="menu-actions"><button type="button" data-action="resume">Resume</button><button type="button" data-action="save">Save</button><button type="button" data-action="load">Load</button></div>
+  </div></section>
+  <section id="endcard" class="overlay"><div>
+    <h2 class="end-title" id="endcard-title">Busted</h2><p class="overlay-copy">The Ceniza police took your cut and your liberty.</p>
+    <div class="menu-actions"><button type="button" data-action="respawn">Hospital</button><button type="button" data-action="reload">Restart</button></div>
+  </div></section>
+  <script type="importmap">{ "imports": { "three": "./vendor/three.module.min.js" } }</script>
+  <script type="module" src="./src/main.js"></script>
 </body>
 </html>
