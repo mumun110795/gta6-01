@@ -146,7 +146,7 @@ export function createHud(refs = {}) {
       if (clock) clock.textContent = text;
     },
     setSpeed(kmh) {
-      if (speedValue) speedValue.textContent = String(Math.max(0, Math.floor(Number(kmh) || 0)));
+      if (speedValue) speedValue.textContent = Math.max(0, Math.floor(Number(kmh) || 0)).toLocaleString('en-US');
       setDisplay(speed, Number(kmh) > 0);
     },
     flashMessage(text) {
