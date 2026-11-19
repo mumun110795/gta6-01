@@ -13,6 +13,7 @@ export const CAR_KINDS = Object.freeze([
   'pickup',
   'sports',
   'van',
+  'luxury',
   'police',
 ]);
 
@@ -22,6 +23,7 @@ const KIND_SPECS = Object.freeze({
   pickup: Object.freeze({ width: 1.88, length: 4.92, bodyHeight: 0.64, cabinLength: 1.42, wheelRadius: 0.39, topSpeed: 42, acceleration: 10.8, grip: 5.8, steerRate: 1.95 }),
   sports: Object.freeze({ width: 1.86, length: 4.28, bodyHeight: 0.4, cabinLength: 1.3, wheelRadius: 0.34, topSpeed: 56, acceleration: 18.5, grip: 7.8, steerRate: 2.5 }),
   van: Object.freeze({ width: 1.95, length: 4.86, bodyHeight: 0.92, cabinLength: 2.65, wheelRadius: 0.37, topSpeed: 38, acceleration: 8.8, grip: 6.1, steerRate: 1.75 }),
+  luxury: Object.freeze({ width: 1.92, length: 4.6, bodyHeight: 0.36, cabinLength: 1.55, wheelRadius: 0.36, topSpeed: 58, acceleration: 19.5, grip: 7.9, steerRate: 2.5 }),
   police: Object.freeze({ width: 1.86, length: 4.55, bodyHeight: 0.56, cabinLength: 1.78, wheelRadius: 0.35, topSpeed: 48, acceleration: 14.6, grip: 7.3, steerRate: 2.35 }),
 });
 
@@ -78,12 +80,14 @@ export function makeCarMesh(kind = 'sedan', color = PAINT_COLORS[0]) {
   const body = new THREE.Group();
   root.add(body);
 
-  const bodyPaint = material(kind === 'police' ? 0xf3f5f8 : color);
-  const cabinPaint = material(kind === 'police' ? 0xf3f5f8 : color, { roughness: 0.38 });
-  const glassPaint = material(PALETTE.glassDay, { roughness: 0.12, metalness: 0.5 });
+  const isLuxury = kind === 'luxury';
+  const bodyPaint = material(kind === 'police' ? 0xf3f5f8 : color, isLuxury ? { roughness: 0.15, metalness: 0.55 } : {});
+  const cabinPaint = material(kind === 'police' ? 0xf3f5f8 : color, isLuxury ? { roughness: 0.16, metalness: 0.55 } : { roughness: 0.38 });
+  const glassPaint = material(isLuxury ? 0x11161f : PALETTE.glassDay, { roughness: isLuxury ? 0.08 : 0.12, metalness: isLuxury ? 0.65 : 0.5 });
   const trimPaint = material(0x22252a, { roughness: 0.68, metalness: 0.12 });
   const tirePaint = material(0x17191c, { roughness: 0.92, metalness: 0.02 });
-  const hubPaint = material(0xb9bfc7, { roughness: 0.28, metalness: 0.8 });
+  const hubPaint = material(isLuxury ? 0xf2f5f8 : 0xb9bfc7, { roughness: isLuxury ? 0.1 : 0.28, metalness: isLuxury ? 1 : 0.8 });
+  const chromePaint = material(0xe8edf2, { roughness: 0.12, metalness: 1 });
 
   const bodyY = spec.wheelRadius + spec.bodyHeight * 0.58;
   const bodyMesh = addBox(
@@ -96,8 +100,8 @@ export function makeCarMesh(kind = 'sedan', color = PAINT_COLORS[0]) {
   );
   bodyMesh.name = 'body';
 
-  const cabinHeight = kind === 'van' ? 0.78 : kind === 'sports' ? 0.38 : 0.54;
-  const cabinZ = kind === 'pickup' ? -0.15 : kind === 'van' ? -0.1 : -0.08;
+  const cabinHeight = kind === 'van' ? 0.78 : kind === 'luxury' ? 0.32 : kind === 'sports' ? 0.38 : 0.54;
+  const cabinZ = kind === 'pickup' ? -0.15 : kind === 'van' ? -0.1 : kind === 'luxury' ? -0.05 : -0.08;
   const cabin = addBox(
     body,
     boxGeometry(spec.width * 0.82, cabinHeight, spec.cabinLength),
@@ -119,6 +123,8 @@ export function makeCarMesh(kind = 'sedan', color = PAINT_COLORS[0]) {
 
   if (kind === 'pickup') {
     addBox(body, boxGeometry(spec.width * 0.9, 0.14, spec.length * 0.42), trimPaint, 0, bodyY + spec.bodyHeight * 0.53, spec.length * 0.24);
+  } else if (kind === 'luxury') {
+    addBox(body, boxGeometry(spec.width * 0.96, 0.05, spec.length * 0.72), chromePaint, 0, bodyY - spec.bodyHeight * 0.32, 0, false);
   } else if (kind === 'police') {
     addBox(body, boxGeometry(spec.width + 0.015, spec.bodyHeight * 0.34, spec.length * 0.3), material(0x20313d), 0, bodyY, 0);
   } else {
@@ -136,12 +142,19 @@ export function makeCarMesh(kind = 'sedan', color = PAINT_COLORS[0]) {
   const wheels = wheelPositions.map(([x, z, isFront]) => {
     const wheel = new THREE.Group();
     wheel.position.set(x, spec.wheelRadius, z);
-    const tire = new THREE.Mesh(wheelGeometry(spec.wheelRadius, kind === 'sports' ? 0.24 : 0.28), tirePaint);
+    const tire = new THREE.Mesh(wheelGeometry(spec.wheelRadius, kind === 'sports' || isLuxury ? 0.26 : 0.28), tirePaint);
     tire.rotation.z = Math.PI * 0.5;
     tire.castShadow = true;
-    const hub = new THREE.Mesh(wheelGeometry(spec.wheelRadius * 0.5, kind === 'sports' ? 0.26 : 0.3), hubPaint);
+    const hub = new THREE.Mesh(wheelGeometry(spec.wheelRadius * (isLuxury ? 0.62 : 0.5), isLuxury ? 0.3 : kind === 'sports' ? 0.26 : 0.3), hubPaint);
     hub.rotation.z = Math.PI * 0.5;
     wheel.add(tire, hub);
+    if (isLuxury) {
+      const spokeA = new THREE.Mesh(boxGeometry(0.3, spec.wheelRadius * 1.5, 0.09), chromePaint);
+      const spokeB = new THREE.Mesh(boxGeometry(0.3, 0.09, spec.wheelRadius * 1.5), chromePaint);
+      spokeA.castShadow = false;
+      spokeB.castShadow = false;
+      wheel.add(spokeA, spokeB);
+    }
     const steeringGroup = new THREE.Group();
     if (isFront) {
       steeringGroup.name = 'front-wheel';
@@ -165,6 +178,14 @@ export function makeCarMesh(kind = 'sedan', color = PAINT_COLORS[0]) {
   addBox(body, boxGeometry(lightWidth, 0.1, 0.08), taillightPaint, -spec.width * 0.31, bodyY, -spec.length * 0.5 - 0.02, false);
   addBox(body, boxGeometry(lightWidth, 0.1, 0.08), taillightPaint, spec.width * 0.31, bodyY, -spec.length * 0.5 - 0.02, false);
   addBox(body, boxGeometry(spec.width * 0.3, 0.07, 0.07), material(0x3a3f45, { metalness: 0.85, roughness: 0.25 }), 0, bodyY + spec.bodyHeight * 0.28, -spec.length * 0.5 - 0.04, false);
+
+  if (isLuxury) {
+    addBox(body, boxGeometry(spec.width * 0.94, 0.08, 0.06), headlightPaint, 0, bodyY + 0.04, spec.length * 0.5 + 0.04, false);
+    addBox(body, boxGeometry(spec.width * 0.94, 0.09, 0.06), taillightPaint, 0, bodyY + 0.04, -spec.length * 0.5 - 0.04, false);
+    addBox(body, boxGeometry(0.09, 0.2, 0.14), trimPaint, -spec.width * 0.32, bodyY + spec.bodyHeight * 0.5 + 0.1, -spec.length * 0.44, false);
+    addBox(body, boxGeometry(0.09, 0.2, 0.14), trimPaint, spec.width * 0.32, bodyY + spec.bodyHeight * 0.5 + 0.1, -spec.length * 0.44, false);
+    addBox(body, boxGeometry(spec.width * 0.98, 0.06, 0.36), trimPaint, 0, bodyY + spec.bodyHeight * 0.5 + 0.22, -spec.length * 0.45);
+  }
 
   let lightBar = null;
   if (kind === 'police') {

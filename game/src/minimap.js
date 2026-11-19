@@ -1,10 +1,10 @@
 import { DISTRICTS } from './config.js';
 
 const ISLAND_RADIUS = 690;
-const OCEAN = '#0b3b4d';
-const LAND = '#406042';
-const ROAD = '#20242a';
-const ACCENT = '#ffb347';
+const OCEAN = '#0e7d99';
+const LAND = '#2fa84f';
+const ROAD = '#333a45';
+const ACCENT = '#ffd43b';
 
 function positionOf(entity) {
   if (!entity) return null;

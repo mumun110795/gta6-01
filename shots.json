@@ -1,6 +1,1 @@
-[
-  { "name": "1-cover.jpg", "query": "?shot=chase&seed=1" },
-  { "name": "2-street.jpg", "query": "?shot=street&seed=1" },
-  { "name": "3-harbor.jpg", "query": "?shot=harbor&seed=1" },
-  { "name": "4-night.jpg", "query": "?shot=night&seed=1" }
-]
+[{"name":"1-cover.jpg","query":"?shot=surround&seed=1"},{"name":"2-street.jpg","query":"?shot=street&seed=1"},{"name":"3-harbor.jpg","query":"?shot=harbor&seed=1"},{"name":"4-night.jpg","query":"?shot=night&seed=1"}]

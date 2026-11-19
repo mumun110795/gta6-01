@@ -131,7 +131,7 @@ function makeWindowTexture() {
   canvas.width = 128;
   canvas.height = 128;
   const context = canvas.getContext('2d');
-  context.fillStyle = '#70767f';
+  context.fillStyle = '#a7b3bc';
   context.fillRect(0, 0, 128, 128);
   const foreground = document.createElement('canvas');
   foreground.width = 128;
@@ -159,15 +159,21 @@ function makeBuildings(scene) {
   const boxGeometry = new THREE.BoxGeometry(1, 1, 1);
   const plainMaterial = new THREE.MeshStandardMaterial({ color: PALETTE.concrete, roughness: 0.72 });
   const warmMaterial = new THREE.MeshStandardMaterial({ color: PALETTE.concreteWarm, roughness: 0.78 });
+  const facadeColors = [
+    0xff6b6b, 0x20c997, 0xffd43b, 0x4dabf7, 0xf783ac, 0x63e6be,
+    0xff922b, 0x9775fa, 0x51cf66, 0xff8787, 0x3bc9db, 0xfcc419,
+    0xff7b9c, 0x74c0fc, 0xa9e34b, 0xffa94d,
+  ];
+  const facadeMaterials = facadeColors.map((color) => new THREE.MeshStandardMaterial({ color, roughness: 0.62 }));
   const { map, emissiveMap } = makeWindowTexture();
   const towerMaterial = new THREE.MeshStandardMaterial({
-    color: PALETTE.glassDay,
+    color: 0xe8f1f5,
     map,
     emissive: 0xffd48a,
     emissiveMap,
     emissiveIntensity: 0,
-    roughness: 0.4,
-    metalness: 0.35,
+    roughness: 0.55,
+    metalness: 0.08,
   });
   CITY_NIGHT_MATERIALS.push(towerMaterial);
 
@@ -177,7 +183,12 @@ function makeBuildings(scene) {
       const depth = 19 + Math.random() * 10;
       const width = 24 + Math.random() * 10;
       const height = 12 + Math.max(0, distanceDowntown) * 112 + Math.random() * 24;
-      const material = Math.random() > 0.42 ? towerMaterial : Math.random() > 0.5 ? plainMaterial : warmMaterial;
+      const roll = Math.random();
+      const material = roll > 0.86
+        ? towerMaterial
+        : roll > 0.76
+          ? (Math.random() > 0.5 ? plainMaterial : warmMaterial)
+          : facadeMaterials[Math.floor(Math.random() * facadeMaterials.length)];
       const building = new THREE.Mesh(boxGeometry, material);
       building.scale.set(width, height, depth);
       building.position.set(x + 16, height / 2, z + 14);
@@ -301,11 +312,91 @@ function makeNeonSign(scene, x, y, z, rotationY, text, color) {
   CITY_NIGHT_MATERIALS.push(material);
 }
 
+function makeContainer(scene, x, z, rotation, color, level = 0) {
+  const container = new THREE.Mesh(
+    new THREE.BoxGeometry(12, 2.8, 2.6),
+    new THREE.MeshStandardMaterial({ color, roughness: 0.55, metalness: 0.25 }),
+  );
+  container.position.set(x, 1.4 + level * 2.85, z);
+  container.rotation.y = rotation;
+  container.castShadow = true;
+  container.receiveShadow = true;
+  scene.add(container);
+  if (level === 0) addAABB(container, 0.3);
+  return container;
+}
+
+function makeCrane(scene, x, z, rotation, color) {
+  const group = new THREE.Group();
+  const paint = new THREE.MeshStandardMaterial({ color, roughness: 0.5, metalness: 0.35 });
+  const legGeometry = new THREE.BoxGeometry(0.9, 21, 0.9);
+  for (const side of [-6, 6]) {
+    const leg = new THREE.Mesh(legGeometry, paint);
+    leg.position.set(side, 10.5, 0);
+    leg.castShadow = true;
+    group.add(leg);
+  }
+  const beam = new THREE.Mesh(new THREE.BoxGeometry(15, 1.4, 1.4), paint);
+  beam.position.y = 21;
+  beam.castShadow = true;
+  group.add(beam);
+  const jib = new THREE.Mesh(new THREE.BoxGeometry(1.1, 1.1, 19), paint);
+  jib.position.set(0, 20.4, 4);
+  jib.castShadow = true;
+  group.add(jib);
+  const cable = new THREE.Mesh(
+    new THREE.BoxGeometry(0.12, 9, 0.12),
+    new THREE.MeshStandardMaterial({ color: 0x22252a, roughness: 0.6 }),
+  );
+  cable.position.set(0, 15.5, 10);
+  group.add(cable);
+  const hook = new THREE.Mesh(new THREE.BoxGeometry(1.6, 1.2, 1.6), paint);
+  hook.position.set(0, 10.6, 10);
+  group.add(hook);
+  group.position.set(x, 0, z);
+  group.rotation.y = rotation;
+  scene.add(group);
+  addAABB(group, 0.3);
+}
+
+function makeBoat(scene, x, z, rotation, hullColor) {
+  const group = new THREE.Group();
+  const hull = new THREE.Mesh(
+    new THREE.BoxGeometry(3.4, 1.4, 10.5),
+    new THREE.MeshStandardMaterial({ color: hullColor, roughness: 0.4, metalness: 0.2 }),
+  );
+  hull.position.y = 0.35;
+  hull.castShadow = true;
+  group.add(hull);
+  const bow = new THREE.Mesh(
+    new THREE.BoxGeometry(2.2, 1.1, 2.6),
+    new THREE.MeshStandardMaterial({ color: hullColor, roughness: 0.4, metalness: 0.2 }),
+  );
+  bow.position.set(0, 0.4, 6.2);
+  group.add(bow);
+  const cabin = new THREE.Mesh(
+    new THREE.BoxGeometry(2.3, 1.5, 2.8),
+    new THREE.MeshStandardMaterial({ color: 0xf5f7fa, roughness: 0.35 }),
+  );
+  cabin.position.set(0, 1.7, -1.2);
+  cabin.castShadow = true;
+  group.add(cabin);
+  const mast = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.09, 0.09, 6.5, 6),
+    new THREE.MeshStandardMaterial({ color: 0xd8dde3, roughness: 0.4, metalness: 0.6 }),
+  );
+  mast.position.set(0, 4.4, 1.8);
+  group.add(mast);
+  group.position.set(x, 0, z);
+  group.rotation.y = rotation;
+  scene.add(group);
+}
+
 function makeHarbor(scene) {
   const { center } = ROAD_LAYOUT.harbor;
   addRoad(center.x - 105, center.z - 20, center.x + 125, center.z - 20, ROAD_LAYOUT.harbor.roadWidth, scene);
   addRoad(center.x - 20, center.z - 80, center.x - 20, center.z + 115, ROAD_LAYOUT.harbor.roadWidth, scene);
-  const deckMaterial = new THREE.MeshStandardMaterial({ color: 0x82725d, roughness: 0.9 });
+  const deckMaterial = new THREE.MeshStandardMaterial({ color: 0x8f9aa3, roughness: 0.8 });
   const deckGeometry = new THREE.BoxGeometry(14, 2, 105);
   for (const [x, z, rotation] of [[-510, 505, 0], [-466, 522, 0], [-380, 505, 0.15]]) {
     const deck = new THREE.Mesh(deckGeometry, deckMaterial);
@@ -315,18 +406,32 @@ function makeHarbor(scene) {
     scene.add(deck);
   }
   const crateGeometry = new THREE.BoxGeometry(4, 4, 4);
-  const crateMaterial = new THREE.MeshStandardMaterial({ color: 0x9a6b3d, roughness: 0.9 });
+  const crateColors = [0xe63946, 0x1d9e75, 0xf4a261, 0x4361ee, 0xe9c46a, 0x9b5de5, 0x00b4d8, 0xef476f];
   for (let index = 0; index < 18; index += 1) {
-    const crate = new THREE.Mesh(crateGeometry, crateMaterial);
+    const crate = new THREE.Mesh(crateGeometry, new THREE.MeshStandardMaterial({ color: crateColors[index % crateColors.length], roughness: 0.75 }));
     crate.position.set(center.x - 90 + (index % 6) * 18, 2, center.z + 65 + Math.floor(index / 6) * 12);
     crate.castShadow = true;
     crate.receiveShadow = true;
     scene.add(crate);
     addAABB(crate);
   }
+  const containerStacks = [
+    [-492, 478, 0.3, 0xe63946, 0], [-492, 478, 0.3, 0x4361ee, 1], [-479, 482, 0.3, 0x2a9d8f, 0],
+    [-458, 492, -0.2, 0x1d9e75, 0], [-458, 492, -0.2, 0xf4a261, 1], [-445, 488, -0.2, 0xe9c46a, 0],
+    [-425, 470, 0.5, 0xe9c46a, 0], [-425, 470, 0.5, 0xe63946, 1],
+    [-482, 452, 0.9, 0x00b4d8, 0], [-505, 462, 0.15, 0xef476f, 0],
+  ];
+  for (const [x, z, rotation, color, level] of containerStacks) makeContainer(scene, x, z, rotation, color, level);
+  makeCrane(scene, -478, 502, 0.4, 0xff7b00);
+  makeCrane(scene, -436, 514, -0.3, 0xffc300);
+  makeBoat(scene, -520, 560, 0.5, 0xe63946);
+  makeBoat(scene, -498, 584, -0.35, 0x00b4d8);
+  makeBoat(scene, -592, 516, 1.1, 0xffc300);
+  makeBoat(scene, -442, 592, 0.9, 0xef476f);
+  makeBoat(scene, -472, 618, -0.6, 0x2a9d8f);
   const warehouse = new THREE.Mesh(
     new THREE.BoxGeometry(86, 28, 50),
-    new THREE.MeshStandardMaterial({ color: 0x77726a, roughness: 0.85 }),
+    new THREE.MeshStandardMaterial({ color: 0x2f6f9f, roughness: 0.7 }),
   );
   warehouse.position.set(-345, 14, 415);
   warehouse.castShadow = true;
@@ -361,7 +466,7 @@ function makeCauseway(scene) {
   }
   const cay = new THREE.Mesh(
     new THREE.CircleGeometry(82, 64),
-    new THREE.MeshStandardMaterial({ color: 0x35323a, roughness: 0.95 }),
+    new THREE.MeshStandardMaterial({ color: 0x554e5e, roughness: 0.95 }),
   );
   cay.rotation.x = -Math.PI / 2;
   cay.position.set(-780, 0.35, -150);

@@ -21,6 +21,32 @@ export const SHOT_SCENES = {
       scene.userData.shotCamera = 'chase';
     }
   },
+  surround: {
+    timeOfDay: 16.9,
+    objective: 'SURROUNDED — ISLAND LOCKDOWN',
+    apply(scene, ctx) {
+      const point = { x: 530, z: 140, heading: -1.89 };
+      ctx.setPlayerAt(point, false);
+      ctx.setWanted(5);
+      ctx.setObjective(ctx.objective);
+      ctx.setExposure(1.35);
+      const carPoint = {
+        x: point.x + Math.cos(point.heading) * 2.6,
+        z: point.z - Math.sin(point.heading) * 2.6,
+        heading: point.heading - 0.44,
+      };
+      ctx.spawnCar('luxury', 0xd90429, carPoint);
+      const radius = 10.5;
+      for (let index = 0; index < 8; index += 1) {
+        const angle = (index / 8) * Math.PI * 2 + 0.2;
+        const x = point.x + Math.cos(angle) * radius;
+        const z = point.z + Math.sin(angle) * radius;
+        ctx.spawnPoliceAt({ x, z, heading: Math.atan2(point.x - x, point.z - z) });
+      }
+      ctx.sprinkleLife({ cars: 0, pedestrians: 6 });
+      scene.userData.shotCamera = { behind: 12.5, height: 5.5 };
+    }
+  },
   street: {
     timeOfDay: 9.5,
     objective: '',
@@ -30,17 +56,18 @@ export const SHOT_SCENES = {
         return candidate.width === 8
           && middle.x > 200
           && middle.x < 360
-          && middle.z > 180
-          && middle.z < 320;
+          && middle.z > 340
+          && middle.z < 380;
       }) ?? ctx.roads[0];
       const heading = Math.atan2(road.x2 - road.x1, road.z2 - road.z1);
       const point = {
-        x: roadMiddle(road).x + Math.cos(heading) * 4.5,
-        z: roadMiddle(road).z - Math.sin(heading) * 4.5,
+        x: roadMiddle(road).x,
+        z: roadMiddle(road).z,
         heading,
       };
       ctx.setPlayerAt(point, false);
       ctx.setWanted(0);
+      ctx.setExposure(1.2);
       for (const distance of [5.5, 10.5, 14]) {
         ctx.spawnPedestrian({
           x: point.x + Math.sin(heading) * distance + Math.cos(heading) * 4.5,
@@ -70,7 +97,7 @@ export const SHOT_SCENES = {
         z: point.z + Math.cos(heading) * 17 + Math.sin(heading) * 2.5,
         heading: heading + Math.PI,
       });
-      ctx.scene.userData.shotCamera = 'thirdPerson';
+      ctx.scene.userData.shotCamera = { behind: 12.5, height: 5 };
     }
   },
   harbor: {
@@ -111,7 +138,7 @@ export const SHOT_SCENES = {
       const forwardZ = Math.cos(point.heading);
       ctx.setPlayerAt(point, false);
       ctx.setWanted(0);
-      ctx.setExposure(2.4);
+      ctx.setExposure(3.0);
       for (const [distance, side, height, text, color] of [
         [28, 11, 18, 'CALIENTE', '#ff4fa3'],
         [28, -11, 16, 'MIRAGE 88', '#58d5ff'],
@@ -148,7 +175,7 @@ export const SHOT_SCENES = {
           heading: point.heading + (side > 0 ? 0.5 : -0.6),
         });
       }
-      ctx.scene.userData.shotCamera = { behind: 7, height: 2.6 };
+      ctx.scene.userData.shotCamera = { behind: 5.5, height: 2.3 };
     }
   }
 };

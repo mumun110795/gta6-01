@@ -166,7 +166,7 @@ const MISSIONS = [
     id: 'm5',
     title: 'Neon Run',
     giver: 'Valeria Prats',
-    reward: 450,
+    reward: 525,
     intro: [
       { speaker: 'Valeria', text: 'Cayo Brasa needs a moving receipt from your headlights. Six gates, no excuses.' },
       { speaker: 'Renzo', text: 'Who am I racing?' },

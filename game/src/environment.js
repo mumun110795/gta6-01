@@ -28,8 +28,8 @@ const phases = [
   { hour: 5.5, top: 0x253757, horizon: 0xb55f47, bottom: 0x161c29, sun: 0xff9a62, light: 0.36, fog: 0x635047, fogDensity: 0.0012 },
   { hour: 7, top: 0x4c8fd2, horizon: 0xffd5a2, bottom: 0x596870, sun: 0xffd7a5, light: 0.95, fog: 0xbccbd6, fogDensity: 0.00062 },
   { hour: 12, top: 0x2f78c8, horizon: 0xa9d9ee, bottom: 0x7b868d, sun: 0xfff4dc, light: 1.25, fog: 0xa9c8d8, fogDensity: 0.0005 },
-  { hour: 17.5, top: 0x4879a8, horizon: 0xffb066, bottom: 0x615651, sun: 0xffb265, light: 0.72, fog: 0xb98f68, fogDensity: 0.00085 },
-  { hour: 19.3, top: 0x1c2a4b, horizon: 0xd06066, bottom: 0x141721, sun: 0xff7b4f, light: 0.3, fog: 0x5c4045, fogDensity: 0.0011 },
+  { hour: 17.5, top: 0x4879a8, horizon: 0xffb066, bottom: 0x77665c, sun: 0xffb265, light: 0.98, fog: 0xc79a6e, fogDensity: 0.0008 },
+  { hour: 19.3, top: 0x1c2a4b, horizon: 0xd06066, bottom: 0x1d212c, sun: 0xff7b4f, light: 0.38, fog: 0x5c4045, fogDensity: 0.0011 },
   { hour: 24, top: 0x050913, horizon: 0x101a2c, bottom: 0x020407, sun: 0x334455, light: 0.17, fog: 0x0a1119, fogDensity: 0.0011 },
 ];
 
@@ -67,12 +67,12 @@ function makeOceanTexture() {
   canvas.width = 256;
   canvas.height = 256;
   const context = canvas.getContext('2d');
-  context.fillStyle = '#135d74';
+  context.fillStyle = '#2fb3cc';
   context.fillRect(0, 0, 256, 256);
   for (let index = 0; index < 620; index += 1) {
     const y = Math.random() * 256;
     const width = 6 + Math.random() * 30;
-    context.fillStyle = Math.random() > 0.72 ? 'rgba(180,230,235,.26)' : 'rgba(25,125,150,.22)';
+    context.fillStyle = Math.random() > 0.72 ? 'rgba(220,250,255,.34)' : 'rgba(64,190,215,.28)';
     context.fillRect(Math.random() * 256, y, width, 1 + Math.random() * 2);
   }
   const texture = new THREE.CanvasTexture(canvas);
@@ -135,8 +135,8 @@ export function createEnvironment(scene, nightMaterials = []) {
     new THREE.MeshStandardMaterial({
       color: PALETTE.water,
       map: oceanTexture,
-      roughness: 0.2,
-      metalness: 0.45,
+      roughness: 0.35,
+      metalness: 0.1,
     }),
   );
   ocean.rotation.x = -Math.PI / 2;
@@ -174,9 +174,9 @@ export function updateEnvironment(environment, deltaTime, focus) {
   environment.skyUniforms.bottomColor.value.copy(palette.bottom);
   environment.sun.color.copy(palette.sun);
   environment.sun.intensity = palette.light;
-  environment.hemisphere.intensity = 0.28 + palette.light * 0.42;
+  environment.hemisphere.intensity = 0.58 + palette.light * 0.5;
   environment.hemisphere.color.copy(palette.horizon).lerp(temporaryColor.setHex(0xd8ecff), 0.45);
-  environment.moon.intensity = THREE.MathUtils.clamp(0.36 - palette.light * 0.3, 0.03, 0.24);
+  environment.moon.intensity = THREE.MathUtils.clamp(0.52 - palette.light * 0.3, 0.03, 0.5);
   environment.scene.fog.color.copy(palette.fog);
   environment.scene.fog.density = palette.fogDensity;
   environment.ocean.material.color.copy(temporaryColor.setHex(PALETTE.water)).lerp(palette.horizon, 0.18);

@@ -114,7 +114,7 @@ camera.position.set(SPAWN_POINTS.playerStart.x + 8, 4, SPAWN_POINTS.playerStart.
 async function bootWorld() {
   environment = createEnvironment(scene, city.nightMaterials);
   cars = [
-    createCar('sedan', 0xd8543f, { x: 181.5, z: 260 }, Math.PI),
+    createCar('luxury', 0xd90429, { x: 181.5, z: 260 }, Math.PI),
     ...spawnParkedCars(scene, city, 100),
   ];
   world.cars = cars;
@@ -679,7 +679,7 @@ function updateFrame() {
           player.heading = point.heading ?? 0;
           player.cameraYaw = player.heading;
           if (driving) {
-            const car = createCar('sports', 0xff4d6d, point, point.heading ?? 0);
+            const car = createCar('luxury', 0xd90429, point, point.heading ?? 0);
             player.mesh.position.copy(player.position);
             car.driver = 'player';
             car.speed = 0;
