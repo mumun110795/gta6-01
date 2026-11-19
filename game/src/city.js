@@ -521,6 +521,351 @@ function makeOutlyingRoads() {
   }
 }
 
+function makeSignTexture(width, height, draw) {
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext('2d');
+  draw(context, width, height);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.anisotropy = 4;
+  return texture;
+}
+
+function roundedRectPath(context, x, y, w, h, r) {
+  context.beginPath();
+  context.moveTo(x + r, y);
+  context.lineTo(x + w - r, y);
+  context.arcTo(x + w, y, x + w, y + r, r);
+  context.lineTo(x + w, y + h - r);
+  context.arcTo(x + w, y + h, x + w - r, y + h, r);
+  context.lineTo(x + r, y + h);
+  context.arcTo(x, y + h, x, y + h - r, r);
+  context.lineTo(x, y + r);
+  context.arcTo(x, y, x + r, y, r);
+  context.closePath();
+}
+
+function makeRoadSigns(scene) {
+  const stopTexture = makeSignTexture(256, 256, (c) => {
+    c.clearRect(0, 0, 256, 256);
+    const octagon = (radius) => {
+      c.beginPath();
+      for (let i = 0; i < 8; i += 1) {
+        const a = Math.PI / 8 + i * Math.PI / 4;
+        const px = 128 + Math.cos(a) * radius;
+        const py = 128 + Math.sin(a) * radius;
+        if (i === 0) c.moveTo(px, py); else c.lineTo(px, py);
+      }
+      c.closePath();
+    };
+    octagon(120);
+    c.fillStyle = '#c0272d';
+    c.fill();
+    octagon(106);
+    c.strokeStyle = '#ffffff';
+    c.lineWidth = 7;
+    c.stroke();
+    c.fillStyle = '#ffffff';
+    c.font = '900 72px sans-serif';
+    c.textAlign = 'center';
+    c.textBaseline = 'middle';
+    c.fillText('STOP', 128, 132);
+  });
+  const speedTexture = makeSignTexture(192, 256, (c) => {
+    roundedRectPath(c, 6, 6, 180, 244, 16);
+    c.fillStyle = '#f7f7f2';
+    c.fill();
+    c.strokeStyle = '#191919';
+    c.lineWidth = 6;
+    c.stroke();
+    c.beginPath();
+    c.arc(96, 88, 52, 0, Math.PI * 2);
+    c.strokeStyle = '#c0272d';
+    c.lineWidth = 10;
+    c.stroke();
+    c.fillStyle = '#141414';
+    c.font = '900 54px sans-serif';
+    c.textAlign = 'center';
+    c.textBaseline = 'middle';
+    c.fillText('30', 96, 92);
+    c.font = '700 26px sans-serif';
+    c.fillText('SPEED', 96, 172);
+    c.fillText('LIMIT', 96, 204);
+  });
+  const crossingTexture = makeSignTexture(256, 256, (c) => {
+    roundedRectPath(c, 6, 6, 244, 244, 20);
+    c.fillStyle = '#1450a0';
+    c.fill();
+    c.strokeStyle = '#ffffff';
+    c.lineWidth = 5;
+    c.stroke();
+    c.fillStyle = '#ffffff';
+    c.beginPath();
+    c.arc(128, 58, 15, 0, Math.PI * 2);
+    c.fill();
+    c.strokeStyle = '#ffffff';
+    c.lineWidth = 15;
+    c.lineCap = 'round';
+    c.beginPath();
+    c.moveTo(128, 80);
+    c.lineTo(123, 136);
+    c.moveTo(128, 94);
+    c.lineTo(97, 118);
+    c.moveTo(128, 94);
+    c.lineTo(161, 82);
+    c.moveTo(123, 136);
+    c.lineTo(99, 194);
+    c.moveTo(123, 136);
+    c.lineTo(157, 186);
+    c.stroke();
+    c.fillRect(42, 216, 34, 10);
+    c.fillRect(94, 216, 34, 10);
+    c.fillRect(146, 216, 34, 10);
+    c.fillRect(198, 216, 20, 10);
+  });
+  const directionalMaterial = (text) => new THREE.MeshStandardMaterial({
+    map: makeSignTexture(512, 128, (c) => {
+      roundedRectPath(c, 4, 4, 504, 120, 12);
+      c.fillStyle = '#14532d';
+      c.fill();
+      c.strokeStyle = '#ffffff';
+      c.lineWidth = 4;
+      c.stroke();
+      c.fillStyle = '#ffffff';
+      c.font = '700 50px sans-serif';
+      c.textAlign = 'left';
+      c.textBaseline = 'middle';
+      c.fillText(text, 26, 68);
+    }),
+    roughness: 0.55,
+    side: THREE.DoubleSide,
+  });
+  const oneWayTexture = makeSignTexture(384, 128, (c) => {
+    roundedRectPath(c, 5, 5, 374, 118, 10);
+    c.fillStyle = '#f7f7f2';
+    c.fill();
+    c.strokeStyle = '#141414';
+    c.lineWidth = 6;
+    c.stroke();
+    c.fillStyle = '#141414';
+    c.font = '900 44px sans-serif';
+    c.textAlign = 'left';
+    c.textBaseline = 'middle';
+    c.fillText('ONE WAY', 22, 68);
+    c.beginPath();
+    c.moveTo(238, 52);
+    c.lineTo(316, 52);
+    c.lineTo(316, 36);
+    c.lineTo(362, 64);
+    c.lineTo(316, 92);
+    c.lineTo(316, 76);
+    c.lineTo(238, 76);
+    c.closePath();
+    c.fill();
+  });
+
+  const poleGeometry = new THREE.CylinderGeometry(0.06, 0.075, 3.4, 8);
+  const poleMaterial = new THREE.MeshStandardMaterial({ color: 0x9aa1a8, roughness: 0.42, metalness: 0.72 });
+  const planeGeometry = new THREE.PlaneGeometry(1, 1);
+  const stopMaterial = new THREE.MeshStandardMaterial({ map: stopTexture, transparent: true, alphaTest: 0.5, side: THREE.DoubleSide, roughness: 0.5 });
+  const speedMaterial = new THREE.MeshStandardMaterial({ map: speedTexture, side: THREE.DoubleSide, roughness: 0.5 });
+  const crossingMaterial = new THREE.MeshStandardMaterial({ map: crossingTexture, side: THREE.DoubleSide, roughness: 0.5 });
+  const oneWayMaterial = new THREE.MeshStandardMaterial({ map: oneWayTexture, side: THREE.DoubleSide, roughness: 0.5 });
+  const directionalMaterials = {
+    centro: directionalMaterial('CENTRO SUR \u2192'),
+    puerto: directionalMaterial('\u2190 PUERTO CALDRA'),
+    playa: directionalMaterial('PLAYA VIDRIO \u2192'),
+    volta: directionalMaterial('VOLTA CLUB \u2192'),
+    centroBack: directionalMaterial('\u2190 CENTRO SUR'),
+  };
+
+  let signCount = 0;
+  function addSign(material, w, h, x, z, rotationY, signY = 2.5) {
+    const pole = new THREE.Mesh(poleGeometry, poleMaterial);
+    pole.position.set(x, 1.7, z);
+    scene.add(pole);
+    const sign = new THREE.Mesh(planeGeometry, material);
+    sign.scale.set(w, h, 1);
+    sign.position.set(x, signY, z);
+    sign.rotation.y = rotationY;
+    scene.add(sign);
+    signCount += 1;
+  }
+
+  let seed = 20261119;
+  const rng = () => {
+    seed = (seed * 1664525 + 1013904223) >>> 0;
+    return seed / 4294967296;
+  };
+  const { minX, maxX, minZ, maxZ, avenueSpacing, avenueWidth, streetSpacing, streetWidth } = ROAD_LAYOUT.city;
+  const avenues = [];
+  for (let x = minX; x <= maxX + 0.1; x += avenueSpacing) avenues.push(x);
+  const streets = [];
+  for (let z = minZ; z <= maxZ + 0.1; z += streetSpacing) streets.push(z);
+
+  let crossingIndex = 0;
+  for (const ax of avenues) {
+    for (const sz of streets) {
+      const cornerX = rng() < 0.5 ? -1 : 1;
+      const cornerZ = rng() < 0.5 ? -1 : 1;
+      const sx = ax + cornerX * (avenueWidth / 2 + 0.9);
+      const szz = sz + cornerZ * (streetWidth / 2 + 0.9);
+      addSign(stopMaterial, 0.95, 0.95, sx, szz, Math.atan2(ax - sx, sz - szz), 2.5);
+      if (crossingIndex % 3 === 0) {
+        const cx = ax - cornerX * (avenueWidth / 2 + 0.9);
+        const cz = sz - cornerZ * (streetWidth / 2 + 0.9);
+        addSign(crossingMaterial, 0.9, 0.9, cx, cz, Math.atan2(ax - cx, sz - cz), 2.5);
+      }
+      crossingIndex += 1;
+    }
+  }
+  for (const ax of avenues) {
+    for (const sz of [minZ + 95, minZ + 275]) {
+      const side = rng() < 0.5 ? -1 : 1;
+      addSign(speedMaterial, 0.78, 1.04, ax + side * (avenueWidth / 2 + 0.9), sz + (rng() * 20 - 10), side > 0 ? Math.PI : 0, 2.35);
+    }
+  }
+  const junctions = [
+    { material: directionalMaterials.centro, x: avenues[2], z: streets[2], rot: 0 },
+    { material: directionalMaterials.puerto, x: avenues[1], z: streets[1], rot: Math.PI },
+    { material: directionalMaterials.playa, x: avenues[3], z: streets[3], rot: 0 },
+    { material: directionalMaterials.volta, x: avenues[2], z: streets[0], rot: Math.PI / 2 },
+    { material: directionalMaterials.centroBack, x: avenues[4], z: streets[2], rot: -Math.PI / 2 },
+  ];
+  for (const junction of junctions) {
+    addSign(junction.material, 2.6, 0.65, junction.x + avenueWidth / 2 + 1.1, junction.z + streetWidth / 2 + 1.1, junction.rot, 2.75);
+  }
+  for (const [ax, sz] of [[avenues[0], streets[1]], [avenues[2], streets[3]], [avenues[4], streets[1]], [avenues[1], streets[4]]]) {
+    addSign(oneWayMaterial, 1.25, 0.42, ax - (avenueWidth / 2 + 0.9), sz + (streetWidth / 2 + 0.9), Math.PI / 2, 2.5);
+  }
+  scene.userData.signCount = signCount;
+}
+
+function makeStreetPlanting(scene) {
+  const trunkGeometry = new THREE.CylinderGeometry(0.13, 0.24, 3.2, 7);
+  trunkGeometry.translate(0, 1.6, 0);
+  const canopyGeometryA = new THREE.IcosahedronGeometry(1.75, 1);
+  const canopyGeometryB = new THREE.IcosahedronGeometry(1.3, 1);
+  const bushGeometry = new THREE.IcosahedronGeometry(0.85, 1);
+  const trunkMaterial = new THREE.MeshStandardMaterial({ color: 0x6e4a2f, roughness: 0.9 });
+  const leafMaterialA = new THREE.MeshStandardMaterial({ color: 0x2f9e4f, roughness: 0.92 });
+  const leafMaterialB = new THREE.MeshStandardMaterial({ color: 0x46b95e, roughness: 0.92 });
+  const palmTrunkGeometry = new THREE.CylinderGeometry(0.25, 0.48, 10, 7);
+  const palmFrondGeometry = new THREE.PlaneGeometry(9, 1.8);
+  const palmTrunkMaterial = new THREE.MeshStandardMaterial({ color: PALETTE.trunk, roughness: 0.88 });
+  const palmFrondMaterial = new THREE.MeshStandardMaterial({ color: PALETTE.frond, roughness: 0.8, side: THREE.DoubleSide });
+
+  let seed = 1357911;
+  const rng = () => {
+    seed = (seed * 1664525 + 1013904223) >>> 0;
+    return seed / 4294967296;
+  };
+  const insideCollider = (x, z, pad) => collidersForCity.some((c) => (
+    x > c.minX - pad && x < c.maxX + pad && z > c.minZ - pad && z < c.maxZ + pad
+  ));
+
+  let trees = 0;
+  let bushes = 0;
+  let palms = 0;
+  function plantTree(x, z) {
+    if (insideCollider(x, z, 1.0)) return;
+    const group = new THREE.Group();
+    const trunk = new THREE.Mesh(trunkGeometry, trunkMaterial);
+    trunk.castShadow = true;
+    group.add(trunk);
+    const canopyA = new THREE.Mesh(canopyGeometryA, rng() < 0.5 ? leafMaterialA : leafMaterialB);
+    canopyA.position.set(0, 3.9, 0);
+    canopyA.castShadow = true;
+    group.add(canopyA);
+    const canopyB = new THREE.Mesh(canopyGeometryB, leafMaterialB);
+    canopyB.position.set(0.8, 3.3, 0.4);
+    canopyB.castShadow = true;
+    group.add(canopyB);
+    if (rng() < 0.7) {
+      const canopyC = new THREE.Mesh(canopyGeometryB, leafMaterialA);
+      canopyC.position.set(-0.75, 3.45, -0.35);
+      canopyC.castShadow = true;
+      group.add(canopyC);
+    }
+    group.position.set(x, 0, z);
+    group.rotation.y = rng() * Math.PI * 2;
+    const scale = 0.9 + rng() * 0.35;
+    group.scale.set(scale, scale * (0.92 + rng() * 0.2), scale);
+    scene.add(group);
+    trees += 1;
+  }
+  function plantBush(x, z, scale = 1) {
+    if (insideCollider(x, z, 0.4)) return;
+    const bush = new THREE.Mesh(bushGeometry, rng() < 0.5 ? leafMaterialA : leafMaterialB);
+    bush.position.set(x, 0.42 * scale, z);
+    bush.scale.set(scale * (0.9 + rng() * 0.5), scale * 0.6, scale * (0.9 + rng() * 0.5));
+    bush.rotation.y = rng() * Math.PI * 2;
+    bush.castShadow = false;
+    bush.receiveShadow = true;
+    scene.add(bush);
+    bushes += 1;
+  }
+
+  const { minX, maxX, minZ, maxZ, avenueSpacing, avenueWidth, streetSpacing, streetWidth } = ROAD_LAYOUT.city;
+  for (let x = minX; x <= maxX + 0.1; x += avenueSpacing) {
+    for (const side of [-1, 1]) {
+      for (let z = minZ + 12; z <= maxZ - 6; z += 36 + rng() * 7) {
+        plantTree(x + side * (avenueWidth / 2 + 1.7), z + (rng() * 4 - 2));
+      }
+    }
+  }
+  for (let z = minZ; z <= maxZ + 0.1; z += streetSpacing) {
+    for (const side of [-1, 1]) {
+      for (let x = minX + 12; x <= maxX - 6; x += 36 + rng() * 7) {
+        plantTree(x + (rng() * 4 - 2), z + side * (streetWidth / 2 + 1.7));
+      }
+    }
+  }
+
+  const harbor = ROAD_LAYOUT.harbor.center;
+  for (let x = harbor.x - 100; x <= harbor.x + 115; x += 21) {
+    makeTree(scene, x + (rng() * 4 - 2), harbor.z - 27.5, palmTrunkGeometry, palmFrondGeometry, palmTrunkMaterial, palmFrondMaterial);
+    palms += 1;
+  }
+  for (const [px, pz] of [[-398, 398], [-368, 400], [-402, 426]]) {
+    makeTree(scene, px, pz, palmTrunkGeometry, palmFrondGeometry, palmTrunkMaterial, palmFrondMaterial);
+    palms += 1;
+  }
+
+  for (const collider of collidersForCity) {
+    const w = collider.maxX - collider.minX;
+    const d = collider.maxZ - collider.minZ;
+    if (w < 12 || w > 60 || d < 8 || d > 60) continue;
+    if (rng() < 0.75) {
+      const count = 1 + Math.floor(rng() * 2);
+      for (let i = 0; i < count; i += 1) plantBush(collider.minX + rng() * w, collider.maxZ + 0.9, 0.8 + rng() * 0.5);
+    }
+    if (rng() < 0.4) plantBush(collider.minX - 0.9, collider.minZ + rng() * d, 0.8 + rng() * 0.4);
+  }
+  for (let x = minX; x <= maxX + 0.1; x += avenueSpacing) {
+    for (const side of [-1, 1]) {
+      for (let z = minZ + 30; z <= maxZ - 10; z += 55) {
+        if (rng() < 0.65) plantBush(x + side * (avenueWidth / 2 + 1.5), z + (rng() * 6 - 3), 0.85 + rng() * 0.4);
+      }
+    }
+  }
+  for (let x = 218; x < 348; x += 10.5) {
+    plantBush(x, 359 + (rng() < 0.5 ? -5.6 : 5.6), 0.9 + rng() * 0.3);
+  }
+  for (let i = 0; i < 18; i += 1) {
+    const angle = rng() * Math.PI * 2;
+    const radius = 30 + rng() * 25;
+    plantBush(-455 + Math.cos(angle) * radius, 500 + Math.sin(angle) * radius * 0.7, 0.85 + rng() * 0.5);
+  }
+  for (const [sx, sz] of [[-752, -174], [-807, -134], [-779, -118], [-821, -188]]) {
+    plantBush(sx + 13.5, sz + 6, 0.9);
+    plantBush(sx - 13.5, sz - 6, 0.9);
+    plantBush(sx + 6, sz - 13.5, 0.85);
+  }
+  scene.userData.plantingCounts = { trees, bushes, palms };
+}
+
 let sceneForRoads = null;
 let collidersForCity = [];
 
@@ -538,6 +883,8 @@ export function buildCity(scene) {
   makeCauseway(scene);
   makeNeonDistrict(scene);
   makeVegetation(scene);
+  makeRoadSigns(scene);
+  makeStreetPlanting(scene);
   makeStreetLights(scene);
   return {
     roads: ROADS,

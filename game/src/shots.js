@@ -1,3 +1,5 @@
+import { aimHelicopterSearchlight, buildHelicopter } from './police.js';
+
 export const SHOT_SCENES = {
   chase: {
     timeOfDay: 18.6,
@@ -36,15 +38,29 @@ export const SHOT_SCENES = {
         heading: point.heading - 0.44,
       };
       ctx.spawnCar('luxury', 0xd90429, carPoint);
-      const radius = 10.5;
+      const radius = 9.5;
       for (let index = 0; index < 8; index += 1) {
         const angle = (index / 8) * Math.PI * 2 + 0.2;
         const x = point.x + Math.cos(angle) * radius;
         const z = point.z + Math.sin(angle) * radius;
         ctx.spawnPoliceAt({ x, z, heading: Math.atan2(point.x - x, point.z - z) });
       }
+      const heli = buildHelicopter();
+      const heliForwardX = Math.sin(point.heading);
+      const heliForwardZ = Math.cos(point.heading);
+      heli.position.set(point.x + heliForwardX * 30, 13.5, point.z + heliForwardZ * 30);
+      heli.lookAt(point.x, 1.2, point.z);
+      heli.rotateZ(0.18);
+      if (heli.userData.rotor) heli.userData.rotor.rotation.y = 0.7;
+      scene.add(heli);
+      heli.updateMatrixWorld(true);
+      aimHelicopterSearchlight(heli, { x: point.x, y: 0.6, z: point.z });
+      if (ctx.camera) {
+        ctx.camera.fov = 64;
+        ctx.camera.updateProjectionMatrix();
+      }
       ctx.sprinkleLife({ cars: 0, pedestrians: 6 });
-      scene.userData.shotCamera = { behind: 12.5, height: 5.5 };
+      scene.userData.shotCamera = { behind: 10, height: 3.5 };
     }
   },
   street: {

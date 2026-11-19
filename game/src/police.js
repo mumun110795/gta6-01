@@ -3,6 +3,144 @@ import { createCar, updateCar } from './cars.js';
 import { Enemy, spawnEnemy } from './combat.js';
 import { WORLD } from './config.js';
 
+const HELI_CIRCLE_RADIUS = 17;
+const HELI_ALTITUDE = 30;
+const HELI_DOWN = new THREE.Vector3(0, -1, 0);
+const _heliFocus = new THREE.Vector3();
+const _heliLocal = new THREE.Vector3();
+const _heliBelly = new THREE.Vector3();
+const _heliDir = new THREE.Vector3();
+const _heliAimPoint = new THREE.Vector3();
+
+let heliPoliceMaterialCache = null;
+function heliPoliceMaterial() {
+  if (heliPoliceMaterialCache) return heliPoliceMaterialCache;
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 128;
+  const context = canvas.getContext('2d');
+  context.clearRect(0, 0, 512, 128);
+  context.font = '900 82px sans-serif';
+  context.textAlign = 'center';
+  context.textBaseline = 'middle';
+  context.fillStyle = '#ffffff';
+  context.fillText('POLICE', 256, 68);
+  const texture = new THREE.CanvasTexture(canvas);
+  heliPoliceMaterialCache = new THREE.MeshBasicMaterial({ map: texture, transparent: true });
+  return heliPoliceMaterialCache;
+}
+
+export function buildHelicopter() {
+  const group = new THREE.Group();
+  group.name = 'police-helicopter';
+  const whitePaint = new THREE.MeshStandardMaterial({ color: 0xf2f4f7, roughness: 0.34, metalness: 0.28 });
+  const bluePaint = new THREE.MeshStandardMaterial({ color: 0x2d62d9, roughness: 0.4, metalness: 0.2 });
+  const darkPaint = new THREE.MeshStandardMaterial({ color: 0x191d23, roughness: 0.55, metalness: 0.3 });
+  const glassPaint = new THREE.MeshStandardMaterial({ color: 0x0e141d, roughness: 0.08, metalness: 0.65 });
+  const metalPaint = new THREE.MeshStandardMaterial({ color: 0x8f979f, roughness: 0.35, metalness: 0.8 });
+  function box(w, h, d, paint, x, y, z) {
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), paint);
+    mesh.position.set(x, y, z);
+    mesh.castShadow = true;
+    group.add(mesh);
+    return mesh;
+  }
+  box(1.9, 1.5, 3.4, whitePaint, 0, 0, 0);
+  const nose = new THREE.Mesh(new THREE.SphereGeometry(1, 18, 12), whitePaint);
+  nose.scale.set(0.92, 0.72, 1.05);
+  nose.position.set(0, -0.05, 1.55);
+  nose.castShadow = true;
+  group.add(nose);
+  const cockpit = new THREE.Mesh(new THREE.SphereGeometry(1, 18, 12), glassPaint);
+  cockpit.scale.set(0.8, 0.55, 0.85);
+  cockpit.position.set(0, 0.28, 1.62);
+  group.add(cockpit);
+  box(1.94, 0.44, 3.44, bluePaint, 0, -0.08, 0);
+  box(1.7, 0.34, 3.0, darkPaint, 0, -0.86, 0);
+  const flankGeometry = new THREE.PlaneGeometry(2.1, 0.4);
+  const flankMaterial = heliPoliceMaterial();
+  for (const sideSign of [-1, 1]) {
+    const flank = new THREE.Mesh(flankGeometry, flankMaterial);
+    flank.position.set(sideSign * 0.99, -0.08, 0);
+    flank.rotation.y = sideSign * Math.PI * 0.5;
+    group.add(flank);
+  }
+  box(0.44, 0.52, 3.8, whitePaint, 0, 0.28, -3.4);
+  box(0.1, 1.05, 0.72, bluePaint, 0, 0.85, -5.15);
+  box(1.15, 0.07, 0.5, whitePaint, 0, 0.42, -5.0);
+  const tailRotor = new THREE.Group();
+  tailRotor.position.set(0.16, 0.85, -5.15);
+  tailRotor.add(
+    new THREE.Mesh(new THREE.BoxGeometry(0.04, 1.1, 0.16), darkPaint),
+    new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.16, 1.1), darkPaint),
+  );
+  group.add(tailRotor);
+  const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.11, 0.4, 8), metalPaint);
+  mast.position.set(0, 0.92, 0.1);
+  group.add(mast);
+  const rotor = new THREE.Group();
+  rotor.position.set(0, 1.14, 0.1);
+  const disc = new THREE.Mesh(
+    new THREE.CircleGeometry(3.9, 32),
+    new THREE.MeshBasicMaterial({ color: 0x1a1d22, transparent: true, opacity: 0.17, side: THREE.DoubleSide, depthWrite: false }),
+  );
+  disc.rotation.x = -Math.PI / 2;
+  rotor.add(
+    new THREE.Mesh(new THREE.BoxGeometry(7.8, 0.05, 0.44), darkPaint),
+    new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.05, 7.8), darkPaint),
+    disc,
+  );
+  group.add(rotor);
+  for (const sideSign of [-1, 1]) {
+    const rail = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.055, 3.1, 8), metalPaint);
+    rail.rotation.x = Math.PI / 2;
+    rail.position.set(sideSign * 0.88, -1.32, 0);
+    rail.castShadow = true;
+    group.add(rail);
+    for (const z of [-0.95, 0.95]) box(0.07, 0.55, 0.07, metalPaint, sideSign * 0.88, -1.05, z);
+  }
+  const redLight = box(0.12, 0.12, 0.12, new THREE.MeshStandardMaterial({ color: 0x330000, emissive: 0xff2222, emissiveIntensity: 2.4 }), -1.0, -0.08, 0.7);
+  const whiteLight = box(0.12, 0.12, 0.12, new THREE.MeshStandardMaterial({ color: 0x333333, emissive: 0xffffff, emissiveIntensity: 2.2 }), 1.0, -0.08, 0.7);
+  const tailLight = box(0.1, 0.1, 0.1, new THREE.MeshStandardMaterial({ color: 0x333333, emissive: 0xffffff, emissiveIntensity: 1.8 }), 0, 0.9, -5.55);
+  redLight.castShadow = false;
+  whiteLight.castShadow = false;
+  tailLight.castShadow = false;
+  const spot = new THREE.SpotLight(0xfff1c4, 1100, 130, 0.32, 0.6, 1.1);
+  spot.position.set(0, -0.95, 0.5);
+  group.add(spot);
+  group.add(spot.target);
+  spot.target.position.set(0, -30, 0.5);
+  const coneGeometry = new THREE.CylinderGeometry(0.3, 3.4, 1, 20, 1, true);
+  coneGeometry.translate(0, -0.5, 0);
+  const cone = new THREE.Mesh(coneGeometry, new THREE.MeshBasicMaterial({
+    color: 0xffe9b0, transparent: true, opacity: 0.13,
+    blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide,
+  }));
+  cone.position.set(0, -0.95, 0.5);
+  group.add(cone);
+  group.userData.rotor = rotor;
+  group.userData.tailRotor = tailRotor;
+  group.userData.spot = spot;
+  group.userData.spotTarget = spot.target;
+  group.userData.cone = cone;
+  return group;
+}
+
+export function aimHelicopterSearchlight(heli, worldPoint) {
+  if (!heli?.userData?.cone || !heli?.userData?.spotTarget) return;
+  const { cone, spotTarget } = heli.userData;
+  _heliLocal.copy(worldPoint);
+  heli.worldToLocal(_heliLocal);
+  spotTarget.position.copy(_heliLocal);
+  _heliBelly.set(0, -0.95, 0.5);
+  _heliDir.copy(_heliLocal).sub(_heliBelly);
+  const distance = Math.max(1, _heliDir.length());
+  _heliDir.normalize();
+  cone.position.copy(_heliBelly);
+  cone.quaternion.setFromUnitVectors(HELI_DOWN, _heliDir);
+  cone.scale.set(1, distance, 1);
+}
+
 const UNIT_TARGETS = [0, 1, 2, 3, 4, 6];
 const DESPAWN_DISTANCE = 270;
 const PATROL_DISTANCE = 55;
@@ -86,6 +224,8 @@ export function createPolice(world) {
     cars: world?.cars ?? [],
     units: [],
     roadblocks: [],
+    heli: null,
+    heliAngle: 0,
     nextId: 0,
     bustTimer: 0,
     busted: false,
@@ -251,6 +391,38 @@ export function updatePolice(police, dt, context = {}) {
   }
   while (police.units.length > targetUnitCount) removeUnit(police, police.units.length - 1);
   updateRoadblocks(police, dt, focus, wanted);
+
+  // Police helicopter: circles the focus at wanted >= 4, gone below that.
+  try {
+    const starsNow = wanted?.stars ?? 0;
+    if (starsNow >= 4 && !police.heli && police.scene) {
+      police.heli = buildHelicopter();
+      police.heliAngle = Math.random() * Math.PI * 2;
+      police.scene.add(police.heli);
+    } else if (starsNow < 4 && police.heli) {
+      police.scene?.remove(police.heli);
+      police.heli = null;
+    }
+    if (police.heli) {
+      police.heliAngle = (police.heliAngle ?? 0) + dt * 0.24;
+      const heli = police.heli;
+      _heliFocus.set(focus.x, focus.y ?? WORLD.roadY, focus.z);
+      heli.position.set(
+        _heliFocus.x + Math.cos(police.heliAngle) * HELI_CIRCLE_RADIUS,
+        _heliFocus.y + HELI_ALTITUDE,
+        _heliFocus.z + Math.sin(police.heliAngle) * HELI_CIRCLE_RADIUS,
+      );
+      heli.lookAt(_heliFocus.x, _heliFocus.y + 1, _heliFocus.z);
+      heli.rotateZ(0.3);
+      if (heli.userData.rotor) heli.userData.rotor.rotation.y += dt * 26;
+      if (heli.userData.tailRotor) heli.userData.tailRotor.rotation.x += dt * 30;
+      heli.updateMatrixWorld(true);
+      _heliAimPoint.set(_heliFocus.x, _heliFocus.y + 0.6, _heliFocus.z);
+      aimHelicopterSearchlight(heli, _heliAimPoint);
+    }
+  } catch {
+    // The helicopter is cosmetic; never let it break the wanted loop.
+  }
 
   let nearestPolice = Infinity;
   for (let index = police.units.length - 1; index >= 0; index -= 1) {

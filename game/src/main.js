@@ -585,6 +585,7 @@ function updateFrame() {
     try {
       applyShotScene(shotParam, {
         scene,
+        camera,
         player,
         cars,
         traffic,
@@ -692,6 +693,11 @@ function updateFrame() {
         },
         SPAWN_POINTS,
       });
+      // Shot scenes are static (sun and focus never move): bake the shadow
+      // map once instead of re-rendering it every frame — under SwiftShader
+      // the per-frame shadow pass otherwise dominates capture time.
+      renderer.shadowMap.autoUpdate = false;
+      renderer.shadowMap.needsUpdate = true;
       gameState = 'playing';
       screens.hideTitle();
       updateCamera(0);

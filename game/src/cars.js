@@ -74,6 +74,24 @@ function addBox(parent, geometry, paint, x, y, z, castShadow = true) {
   return mesh;
 }
 
+let policeDoorMaterialCache = null;
+function policeDoorMaterial() {
+  if (policeDoorMaterialCache) return policeDoorMaterialCache;
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 128;
+  const context = canvas.getContext('2d');
+  context.clearRect(0, 0, 512, 128);
+  context.font = '900 82px sans-serif';
+  context.textAlign = 'center';
+  context.textBaseline = 'middle';
+  context.fillStyle = '#1d3fae';
+  context.fillText('POLICE', 256, 68);
+  const texture = new THREE.CanvasTexture(canvas);
+  policeDoorMaterialCache = new THREE.MeshBasicMaterial({ map: texture, transparent: true });
+  return policeDoorMaterialCache;
+}
+
 export function makeCarMesh(kind = 'sedan', color = PAINT_COLORS[0]) {
   const spec = KIND_SPECS[kind] ?? KIND_SPECS.sedan;
   const root = new THREE.Group();
@@ -131,6 +149,56 @@ export function makeCarMesh(kind = 'sedan', color = PAINT_COLORS[0]) {
     addBox(body, boxGeometry(spec.width * 0.34, spec.bodyHeight * 0.1, spec.length * 0.7), trimPaint, 0, bodyY + spec.bodyHeight * 0.55, 0, false);
   }
 
+  // --- Realism dressing: bumpers, grille, hood/trunk panels, sloped glass,
+  // framed pillars, mirrors, plates, indicators, exhaust, police door text ---
+  const platePaint = material(0xdfe3e8, { roughness: 0.55, metalness: 0.05 });
+  const amberPaint = material(0xff9f1a, { emissive: 0xff8c00, emissiveIntensity: 0.85, roughness: 0.3 });
+  const darkPaint = material(0x14171b, { roughness: 0.6, metalness: 0.3 });
+  const panelPaint = material(new THREE.Color(kind === 'police' ? 0xf3f5f8 : color).multiplyScalar(0.88), { roughness: 0.5, metalness: 0.2 });
+  const cabinCenterY = bodyY + spec.bodyHeight * 0.5 + cabinHeight * 0.5;
+  const cabinFrontZ = cabinZ + spec.cabinLength * 0.5;
+  const cabinBackZ = cabinZ - spec.cabinLength * 0.5;
+  addBox(body, boxGeometry(spec.width * 0.98, spec.bodyHeight * 0.34, 0.14), trimPaint, 0, bodyY - spec.bodyHeight * 0.16, spec.length * 0.5 + 0.05, false);
+  addBox(body, boxGeometry(spec.width * 0.98, spec.bodyHeight * 0.34, 0.14), trimPaint, 0, bodyY - spec.bodyHeight * 0.16, -spec.length * 0.5 - 0.05, false);
+  addBox(body, boxGeometry(spec.width * 0.52, 0.15, 0.06), darkPaint, 0, bodyY + spec.bodyHeight * 0.16, spec.length * 0.5 + 0.03, false);
+  const hoodLength = spec.length * 0.5 - cabinFrontZ;
+  if (hoodLength > 0.34 && kind !== 'van') {
+    addBox(body, boxGeometry(spec.width * 0.86, 0.045, hoodLength * 0.92), panelPaint, 0, bodyY + spec.bodyHeight * 0.5 + 0.012, cabinFrontZ + hoodLength * 0.5, false);
+  }
+  const trunkLength = spec.length * 0.5 + cabinBackZ;
+  if (trunkLength > 0.34 && kind !== 'van' && kind !== 'pickup') {
+    addBox(body, boxGeometry(spec.width * 0.86, 0.045, trunkLength * 0.9), panelPaint, 0, bodyY + spec.bodyHeight * 0.5 + 0.012, cabinBackZ - trunkLength * 0.5, false);
+  }
+  const windshield = addBox(body, boxGeometry(spec.width * 0.8, cabinHeight * 0.66, 0.045), glassPaint, 0, cabinCenterY, cabinFrontZ - 0.03, false);
+  windshield.rotation.x = -0.36;
+  if (kind !== 'pickup') {
+    const rearWindow = addBox(body, boxGeometry(spec.width * 0.8, cabinHeight * 0.6, 0.045), glassPaint, 0, cabinCenterY, cabinBackZ + 0.03, false);
+    rearWindow.rotation.x = 0.36;
+  }
+  const pillarGeometry = boxGeometry(0.07, cabinHeight * 0.98, 0.07);
+  const pillarPaint = kind === 'pickup' ? trimPaint : cabinPaint;
+  for (const sideSign of [-1, 1]) {
+    addBox(body, pillarGeometry, pillarPaint, sideSign * spec.width * 0.415, cabinCenterY, cabinZ + spec.cabinLength * 0.4, false);
+    addBox(body, pillarGeometry, pillarPaint, sideSign * spec.width * 0.415, cabinCenterY, cabinZ - spec.cabinLength * 0.4, false);
+    addBox(body, boxGeometry(0.15, 0.1, 0.07), trimPaint, sideSign * (spec.width * 0.5 + 0.09), cabinCenterY + cabinHeight * 0.18, cabinFrontZ - 0.14, false);
+  }
+  addBox(body, boxGeometry(0.46, 0.12, 0.025), platePaint, 0, bodyY - spec.bodyHeight * 0.02, -spec.length * 0.5 - 0.125, false);
+  addBox(body, boxGeometry(0.46, 0.12, 0.025), platePaint, 0, bodyY - spec.bodyHeight * 0.02, spec.length * 0.5 + 0.125, false);
+  addBox(body, boxGeometry(0.1, 0.08, 0.05), amberPaint, -spec.width * 0.455, bodyY, spec.length * 0.5 + 0.03, false);
+  addBox(body, boxGeometry(0.1, 0.08, 0.05), amberPaint, spec.width * 0.455, bodyY, spec.length * 0.5 + 0.03, false);
+  if (kind === 'sports' || kind === 'luxury') {
+    addBox(body, boxGeometry(0.1, 0.07, 0.14), chromePaint, spec.width * 0.3, spec.wheelRadius * 0.5, -spec.length * 0.5 - 0.05, false);
+  }
+  if (kind === 'police') {
+    const doorGeometry = cachedGeometry('police-door-plane', () => new THREE.PlaneGeometry(1.3, 0.33));
+    for (const sideSign of [-1, 1]) {
+      const door = new THREE.Mesh(doorGeometry, policeDoorMaterial());
+      door.position.set(sideSign * (spec.width * 0.5 + 0.008), bodyY + 0.02, 0.62);
+      door.rotation.y = sideSign * Math.PI * 0.5;
+      body.add(door);
+    }
+  }
+
   const wheelSpacingX = spec.width * 0.5;
   const wheelSpacingZ = spec.length * (kind === 'pickup' ? 0.32 : 0.31);
   const wheelPositions = [
@@ -148,12 +216,17 @@ export function makeCarMesh(kind = 'sedan', color = PAINT_COLORS[0]) {
     const hub = new THREE.Mesh(wheelGeometry(spec.wheelRadius * (isLuxury ? 0.62 : 0.5), isLuxury ? 0.3 : kind === 'sports' ? 0.26 : 0.3), hubPaint);
     hub.rotation.z = Math.PI * 0.5;
     wheel.add(tire, hub);
-    if (isLuxury) {
-      const spokeA = new THREE.Mesh(boxGeometry(0.3, spec.wheelRadius * 1.5, 0.09), chromePaint);
-      const spokeB = new THREE.Mesh(boxGeometry(0.3, 0.09, spec.wheelRadius * 1.5), chromePaint);
+    if (isLuxury || kind === 'sports' || kind === 'police') {
+      const spokePaint = isLuxury ? chromePaint : hubPaint;
+      const spokeA = new THREE.Mesh(boxGeometry(0.32, spec.wheelRadius * 1.5, 0.09), spokePaint);
+      const spokeB = new THREE.Mesh(boxGeometry(0.32, 0.09, spec.wheelRadius * 1.5), spokePaint);
       spokeA.castShadow = false;
       spokeB.castShadow = false;
       wheel.add(spokeA, spokeB);
+    } else {
+      const spoke = new THREE.Mesh(boxGeometry(0.32, spec.wheelRadius * 1.45, 0.07), trimPaint);
+      spoke.castShadow = false;
+      wheel.add(spoke);
     }
     const steeringGroup = new THREE.Group();
     if (isFront) {
